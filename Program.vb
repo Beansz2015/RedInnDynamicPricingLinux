@@ -38,6 +38,25 @@ Module Program
             Console.WriteLine("✅ Configuration loaded successfully")
             Console.WriteLine($"Property ID: {configuration("LittleHotelier:PropertyId")}")
             Console.WriteLine($"Email enabled: {Not String.IsNullOrEmpty(configuration("Email:SmtpHost"))}")
+
+            Console.WriteLine()
+            Console.WriteLine("=== TIMEZONE DEBUG ===")
+            Console.WriteLine($"🕐 Local timezone: {TimeZoneInfo.Local.DisplayName}")
+            Console.WriteLine($"🕐 Local time: {DateTime.Now}")
+            Console.WriteLine($"🕐 UTC time: {DateTime.UtcNow}")
+            Console.WriteLine($"🕐 Environment TZ: {Environment.GetEnvironmentVariable("TZ")}")
+
+            ' Test your GetBusinessDateTime method
+            Try
+                Dim pricingServiceTest As New DynamicPricingService(configuration)
+                Dim businessTime = pricingServiceTest.GetBusinessDateTime() ' You'll need to make this method public temporarily
+                Console.WriteLine($"🕐 Business time: {businessTime}")
+            Catch
+                Console.WriteLine($"🕐 Business time: Cannot test (method private)")
+            End Try
+
+            Console.WriteLine("=== END TIMEZONE DEBUG ===")
+            Console.WriteLine()
             Console.WriteLine()
 
             ' Create and test the main service

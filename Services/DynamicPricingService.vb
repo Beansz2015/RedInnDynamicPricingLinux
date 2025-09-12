@@ -72,7 +72,7 @@ Public Class DynamicPricingService
 
 
     ' Business timezone helper
-    Private Function GetBusinessDateTime() As DateTime
+    Public Function GetBusinessDateTime() As DateTime
         Try
             Dim timeZoneInfo As TimeZoneInfo
 
