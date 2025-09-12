@@ -14,10 +14,10 @@ Module Program
 
             ' Build configuration with environment-specific support - FIXED
             Dim builder = New ConfigurationBuilder() _
-                .SetBasePath(AppContext.BaseDirectory) _
-                .AddJsonFile("appsettings.json", optional:=False, reloadOnChange:=True) _
-                .AddJsonFile($"appsettings.{env}.json", optional:=True, reloadOnChange:=True) _
-                .AddEnvironmentVariables()
+    .SetBasePath(AppContext.BaseDirectory) _
+    .AddJsonFile("appsettings.json", optional:=False, reloadOnChange:=True) _
+    .AddJsonFile($"appsettings.{env}.json", optional:=True, reloadOnChange:=True) _
+    .AddEnvironmentVariables()
 
             Dim configuration = builder.Build()
 
