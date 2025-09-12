@@ -1,0 +1,23 @@
+# Development files
+bin/Debug/
+obj/
+*.user
+*.suo
+.vs/
+
+# Source files (only include published output)
+*.vb
+*.sln
+*.vbproj
+
+# Documentation
+README.md
+*.txt
+
+# Git
+.git/
+.gitignore
+
+# Credentials (will be mounted separately)
+credentials/
+Credentials/
