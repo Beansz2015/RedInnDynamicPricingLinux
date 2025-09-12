@@ -6,6 +6,7 @@ Imports System.IO
 Imports Microsoft.Extensions.Configuration  ' NEW - replaces System.Configuration
 Imports System.Net.Mail
 Imports System.Net
+Imports TimeZoneConverter
 
 Public Class DynamicPricingService
     Private ReadOnly httpClient As New HttpClient()
@@ -72,8 +73,24 @@ Public Class DynamicPricingService
 
     ' Business timezone helper
     Private Function GetBusinessDateTime() As DateTime
-        Dim businessTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Singapore Standard Time")
-        Return TimeZoneInfo.ConvertTime(DateTime.UtcNow, businessTimeZone)
+        Try
+            Dim timeZoneInfo As TimeZoneInfo
+
+            ' Use cross-platform timezone handling
+            Try
+                ' Try Windows timezone ID first
+                timeZoneInfo = TimeZoneInfo.FindSystemTimeZoneById("Singapore Standard Time")
+            Catch
+                ' Fallback to IANA timezone ID for Linux
+                timeZoneInfo = TimeZoneInfo.FindSystemTimeZoneById("Asia/Singapore")
+            End Try
+
+            Return TimeZoneInfo.ConvertTime(DateTime.UtcNow, timeZoneInfo)
+        Catch ex As Exception
+            Console.WriteLine($"Warning: Timezone conversion failed, using manual UTC+8: {ex.Message}")
+            ' Manual fallback to Singapore time
+            Return DateTime.UtcNow.AddHours(8)
+        End Try
     End Function
 
     Private Function GetBusinessToday() As DateTime

@@ -5,6 +5,7 @@ Imports Google.Apis.Auth.OAuth2
 Imports Google.Apis.Services
 Imports Google.Apis.Sheets.v4
 Imports Google.Apis.Sheets.v4.Data
+Imports TimeZoneConverter
 
 Public Class GoogleSheetsService
     Private ReadOnly service As SheetsService
@@ -228,8 +229,24 @@ Public Class GoogleSheetsService
     End Sub
 
     Private Function GetBusinessDateTime() As DateTime
-        Dim businessTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Singapore Standard Time")
-        Return TimeZoneInfo.ConvertTime(DateTime.UtcNow, businessTimeZone)
+        Try
+            Dim timeZoneInfo As TimeZoneInfo
+
+            ' Use cross-platform timezone handling
+            Try
+                ' Try Windows timezone ID first
+                timeZoneInfo = TimeZoneInfo.FindSystemTimeZoneById("Singapore Standard Time")
+            Catch
+                ' Fallback to IANA timezone ID for Linux
+                timeZoneInfo = TimeZoneInfo.FindSystemTimeZoneById("Asia/Singapore")
+            End Try
+
+            Return TimeZoneInfo.ConvertTime(DateTime.UtcNow, timeZoneInfo)
+        Catch ex As Exception
+            Console.WriteLine($"Warning: Timezone conversion failed, using manual UTC+8: {ex.Message}")
+            ' Manual fallback to Singapore time
+            Return DateTime.UtcNow.AddHours(8)
+        End Try
     End Function
 
     ' ============ EXISTING PRIVATE METHODS (KEEP UNCHANGED) ============

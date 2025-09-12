@@ -10,6 +10,9 @@ COPY bin/Release/net8.0/publish/ ./
 # Create directories for external dependencies
 RUN mkdir -p /app/credentials /app/logs
 
+# CRITICAL FIX: Install timezone data package
+RUN apt-get update && apt-get install -y tzdata && rm -rf /var/lib/apt/lists/*
+
 # Set timezone to Singapore (your business timezone)
 ENV TZ=Asia/Singapore
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
