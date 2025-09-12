@@ -8,11 +8,31 @@ Module Program
             Console.WriteLine($"Started at: {DateTime.Now}")
             Console.WriteLine()
 
-            ' Build configuration
-            Dim configuration = New ConfigurationBuilder() _
+            ' Read environment variable - FIXED: Use different variable name
+            Dim env As String = System.Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
+            If String.IsNullOrEmpty(env) Then env = "Production"
+
+            ' Build configuration with environment-specific support - FIXED
+            Dim builder = New ConfigurationBuilder() _
                 .SetBasePath(AppContext.BaseDirectory) _
-                .AddJsonFile("appsettings.json", optional:=False) _
-                .Build()
+                .AddJsonFile("appsettings.json", optional:=False, reloadOnChange:=True) _
+                .AddJsonFile($"appsettings.{env}.json", optional:=True, reloadOnChange:=True) _
+                .AddEnvironmentVariables()
+
+            Dim configuration = builder.Build()
+
+            ' Debug output to verify config loading - IMPORTANT
+            Console.WriteLine("=== CONFIGURATION DEBUG ===")
+            Console.WriteLine($"Environment: {env}")
+            Console.WriteLine("Loaded configuration files:")
+            Console.WriteLine(" ✓ appsettings.json")
+            Console.WriteLine($" ✓ appsettings.{env}.json")
+
+            ' CRITICAL: Log the actual credentials path being used
+            Dim credentialsPath = configuration("GoogleSheets:CredentialsPath")
+            Console.WriteLine($"Google Credentials Path: {credentialsPath}")
+            Console.WriteLine("=== END CONFIG DEBUG ===")
+            Console.WriteLine()
 
             ' Test configuration reading
             Console.WriteLine("✅ Configuration loaded successfully")

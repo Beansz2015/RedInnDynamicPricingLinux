@@ -6,14 +6,11 @@ services:
     container_name: red-inn-pricing
     environment:
       - TZ=Asia/Singapore
-      - ASPNETCORE_ENVIRONMENT=Production
     volumes:
-      # Mount your local Credentials folder to container
+      # Mount your Credentials folder to /app/credentials in container
       - ./Credentials:/app/credentials:ro
       # Mount logs directory for output
       - ./logs:/app/logs
-      # Optional: Override with production config
-      - ./appsettings.Production.json:/app/appsettings.Production.json:ro
     restart: unless-stopped
     # For testing - remove in production
     stdin_open: true
