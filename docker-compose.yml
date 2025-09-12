@@ -6,10 +6,14 @@ services:
     container_name: red-inn-pricing
     environment:
       - TZ=Asia/Singapore
-      - ASPNETCORE_ENVIRONMENT=Production    
+      - ASPNETCORE_ENVIRONMENT=Production
+      # Add explicit Google credentials environment variable
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/red-inn-court-dynamic-pricing-0bda2d982d1e.json
     volumes:
       - ./Credentials:/app/credentials:ro
       - ./logs:/app/logs
+      # Add time synchronization
+      - /etc/localtime:/etc/localtime:ro
     restart: unless-stopped
     stdin_open: true
     tty: true
