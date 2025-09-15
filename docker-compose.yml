@@ -11,5 +11,12 @@ services:
       - ./Credentials:/app/credentials:ro
       - ./logs:/app/logs
     restart: unless-stopped
+     # Add resource limits for t2.micro
+    deploy:
+      resources:
+        limits:
+          memory: 800M
+        reservations:
+          memory: 400M
     stdin_open: true
     tty: true
