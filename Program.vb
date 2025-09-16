@@ -85,8 +85,8 @@ Module Program
         Catch ex As Exception
             Console.WriteLine($"❌ Fatal error: {ex.Message}")
             Console.WriteLine($"Stack trace: {ex.StackTrace}")
-            Console.WriteLine("Press any key to exit...")
-            Console.ReadKey()
+            Environment.Exit(1)  ' Exit with error code
         End Try
+
     End Sub
 End Module
