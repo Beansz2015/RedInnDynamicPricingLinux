@@ -78,9 +78,9 @@ Module Program
             End Try
 
             Console.WriteLine()
-            Console.WriteLine("✅ Day 3 complete migration test finished!")
-            Console.WriteLine("Press any key to exit...")
-            Console.ReadKey()
+            Console.WriteLine("✅ Dynamic pricing check completed!")
+            Environment.Exit(0)  ' Exit successfully
+
 
         Catch ex As Exception
             Console.WriteLine($"❌ Fatal error: {ex.Message}")
