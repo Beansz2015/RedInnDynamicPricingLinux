@@ -363,7 +363,10 @@ Public Class DynamicPricingService
             Dim daysAhead = DateDiff(DateInterval.Day, GetBusinessToday(), DateTime.Parse(targetDate))
             Dim dayLabel = If(daysAhead = 0, "Today", If(daysAhead = 1, "Day +1", "Day >+2"))
 
-            Console.WriteLine($"Date: {targetDate} ({dayLabel})")
+            Dim dayType = IsWeekendOrHoliday(targetDate)
+            Dim dayTypeIndicator = If(dayType = "Regular", "", $" [{dayType}]")
+
+            Console.WriteLine($"Date: {targetDate} ({dayLabel}){dayTypeIndicator}")
             Console.WriteLine($"  Dorms: {availability.DormBedsAvailable}/{totalDormBeds} available - RM{calculatedRates.DormRegularRate}/RM{calculatedRates.DormWalkInRate}")
             Console.WriteLine($"  Private: {availability.PrivateRoomsAvailable}/{totalPrivateRooms} available - RM{calculatedRates.PrivateRegularRate}/RM{calculatedRates.PrivateWalkInRate}")
             Console.WriteLine($"  Ensuite: {availability.PrivateEnsuitesAvailable}/{totalEnsuiteRooms} available - RM{calculatedRates.EnsuiteRegularRate}/RM{calculatedRates.EnsuiteWalkInRate}")
@@ -421,36 +424,30 @@ Public Class DynamicPricingService
     End Function
 
     Private Function GetCurrentRates(avail As RoomAvailability, dateStr As String) As PreviousRate
-        ' Use DateTime.Today and DateDiff for accurate day calculation
+        ' Get base rates (existing logic)
         Dim daysAhead = DateDiff(DateInterval.Day, GetBusinessToday(), DateTime.Parse(dateStr))
-        Dim dayPrefix As String
+        Dim dayPrefix As String = If(daysAhead = 0, "Today", If(daysAhead = 1, "Day1_", "Day2Plus_"))
 
-        If daysAhead = 0 Then
-            dayPrefix = "Today"
-        ElseIf daysAhead = 1 Then
-            dayPrefix = "Day1_"
-        Else
-            dayPrefix = "Day2Plus_"
-        End If
-
-        ' Get Dorm rates
+        ' Get base rates
         Dim dormRates = GetRoomTypeRates("Dorm", dayPrefix, avail.DormBedsAvailable)
-
-        ' Get Private rates  
         Dim privateRates = GetRoomTypeRates("Private", dayPrefix, avail.PrivateRoomsAvailable)
-
-        ' Get Ensuite rates
         Dim ensuiteRates = GetRoomTypeRates("Ensuite", dayPrefix, avail.PrivateEnsuitesAvailable)
 
+        ' Apply surcharges
+        Dim dormSurcharge = CalculateRateWithSurcharges(dormRates.RegularRate, dateStr)
+        Dim privateSurcharge = CalculateRateWithSurcharges(privateRates.RegularRate, dateStr)
+        Dim ensuiteSurcharge = CalculateRateWithSurcharges(ensuiteRates.RegularRate, dateStr)
+
         Return New PreviousRate With {
-            .DormRegularRate = dormRates.RegularRate,
-            .DormWalkInRate = dormRates.WalkInRate,
-            .PrivateRegularRate = privateRates.RegularRate,
-            .PrivateWalkInRate = privateRates.WalkInRate,
-            .EnsuiteRegularRate = ensuiteRates.RegularRate,
-            .EnsuiteWalkInRate = ensuiteRates.WalkInRate
-        }
+        .DormRegularRate = dormSurcharge.FinalRate,
+        .DormWalkInRate = dormRates.WalkInRate,  ' Walk-in rates don't get surcharge
+        .PrivateRegularRate = privateSurcharge.FinalRate,
+        .PrivateWalkInRate = privateRates.WalkInRate,
+        .EnsuiteRegularRate = ensuiteSurcharge.FinalRate,
+        .EnsuiteWalkInRate = ensuiteRates.WalkInRate
+    }
     End Function
+
 
     Private Function GetRoomTypeRates(roomType As String, dayPrefix As String, available As Integer) As (RegularRate As Double, WalkInRate As Double)
         Dim configKey As String = ""
@@ -758,5 +755,89 @@ Public Class DynamicPricingService
                 Return "Unknown"
         End Select
     End Function
+
+    ' NEW: Calculate surcharges based on Google Sheets config
+    Private Function CalculateRateWithSurcharges(baseRate As Double, targetDate As String) As SurchargeResult
+        Dim result As New SurchargeResult With {
+        .BaseRate = baseRate,
+        .WeekendSurcharge = 0,
+        .PublicHolidaySurcharge = 0,
+        .FinalRate = baseRate
+    }
+
+        Try
+            If googleSheetsService Is Nothing OrElse Not googleSheetsService.IsGoogleSheetsEnabled() Then
+                Return result
+            End If
+
+            ' Check if surcharges are enabled
+            Dim surchargesEnabled = String.Equals(configuration("GoogleSheets:EnableSurcharges"), "true", StringComparison.OrdinalIgnoreCase)
+            If Not surchargesEnabled Then
+                Return result
+            End If
+
+            Dim checkDate = DateTime.Parse(targetDate)
+            Dim surchargeConfigs = googleSheetsService.GetSurchargeConfig()
+            Dim publicHolidays = googleSheetsService.GetPublicHolidays()
+
+            ' Check for weekend surcharge (Friday = 5, Saturday = 6)
+            If (checkDate.DayOfWeek = DayOfWeek.Friday OrElse checkDate.DayOfWeek = DayOfWeek.Saturday) AndAlso
+           surchargeConfigs.ContainsKey("Weekend") AndAlso surchargeConfigs("Weekend").Enabled Then
+
+                result.WeekendSurcharge = CalculateSurchargeAmount(baseRate, surchargeConfigs("Weekend"))
+                result.AppliedSurcharges.Add($"Weekend ({surchargeConfigs("Weekend").Amount}%)")
+            End If
+
+            ' Check for public holiday surcharge
+            Dim isPublicHoliday = publicHolidays.Any(Function(h) h.Enabled AndAlso h.HolidayDate.Date = checkDate.Date)
+            If isPublicHoliday AndAlso surchargeConfigs.ContainsKey("PublicHoliday") AndAlso surchargeConfigs("PublicHoliday").Enabled Then
+                result.PublicHolidaySurcharge = CalculateSurchargeAmount(baseRate, surchargeConfigs("PublicHoliday"))
+                Dim holiday = publicHolidays.First(Function(h) h.HolidayDate.Date = checkDate.Date)
+                result.AppliedSurcharges.Add($"Public Holiday - {holiday.Description} ({surchargeConfigs("PublicHoliday").Amount}%)")
+            End If
+
+            ' Calculate final rate
+            result.FinalRate = result.BaseRate + result.WeekendSurcharge + result.PublicHolidaySurcharge
+
+        Catch ex As Exception
+            Console.WriteLine($"Error calculating surcharges for {targetDate}: {ex.Message}")
+        End Try
+
+        Return result
+    End Function
+
+    Private Function CalculateSurchargeAmount(baseRate As Double, surchargeConfig As SurchargeConfig) As Double
+        Select Case surchargeConfig.Type.ToLower()
+            Case "percentage"
+                Return baseRate * (surchargeConfig.Amount / 100)
+            Case "fixed"
+                Return surchargeConfig.Amount
+            Case Else
+                Return 0
+        End Select
+    End Function
+
+    Private Function IsWeekendOrHoliday(targetDate As String) As String
+        Try
+            Dim checkDate = DateTime.Parse(targetDate)
+            Dim publicHolidays = If(googleSheetsService?.GetPublicHolidays(), New List(Of PublicHoliday))
+
+            Dim isWeekend = checkDate.DayOfWeek = DayOfWeek.Friday OrElse checkDate.DayOfWeek = DayOfWeek.Saturday
+            Dim isHoliday = publicHolidays.Any(Function(h) h.Enabled AndAlso h.HolidayDate.Date = checkDate.Date)
+
+            If isHoliday AndAlso isWeekend Then
+                Return "Weekend + Holiday"
+            ElseIf isHoliday Then
+                Return "Public Holiday"
+            ElseIf isWeekend Then
+                Return "Weekend"
+            Else
+                Return "Regular"
+            End If
+        Catch
+            Return "Regular"
+        End Try
+    End Function
+
 
 End Class

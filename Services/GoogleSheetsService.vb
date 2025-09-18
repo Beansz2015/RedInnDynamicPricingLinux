@@ -417,6 +417,129 @@ Public Class GoogleSheetsService
         Return String.Equals(enabledSetting, "true", StringComparison.OrdinalIgnoreCase)
     End Function
 
+    '------------- SURCHARGE AND HOLIDAY METHODS --------------
+
+    ' Caches for surcharge data
+    Private surchargeCache As Dictionary(Of String, SurchargeConfig)
+    Private publicHolidaysCache As List(Of PublicHoliday)
+    Private lastSurchargeCacheUpdate As DateTime
+    Private lastHolidayCacheUpdate As DateTime
+
+    Public Function GetSurchargeConfig() As Dictionary(Of String, SurchargeConfig)
+        Try
+            If surchargeCache IsNot Nothing AndAlso DateTime.Now.Subtract(lastSurchargeCacheUpdate).TotalMinutes < cacheExpiryMinutes Then
+                Return surchargeCache
+            End If
+
+            Dim freshData = FetchSurchargeDataFromSheets()
+            If freshData.Count > 0 Then
+                surchargeCache = freshData
+                lastSurchargeCacheUpdate = DateTime.Now
+            End If
+            Return If(surchargeCache, New Dictionary(Of String, SurchargeConfig))
+
+        Catch ex As Exception
+            Console.WriteLine($"Error getting surcharge data from Google Sheets: {ex.Message}")
+            Return If(surchargeCache, New Dictionary(Of String, SurchargeConfig))
+        End Try
+    End Function
+
+    Public Function GetPublicHolidays() As List(Of PublicHoliday)
+        Try
+            If publicHolidaysCache IsNot Nothing AndAlso DateTime.Now.Subtract(lastHolidayCacheUpdate).TotalMinutes < cacheExpiryMinutes Then
+                Return publicHolidaysCache
+            End If
+
+            Dim freshData = FetchPublicHolidaysFromSheets()
+            If freshData.Count > 0 Then
+                publicHolidaysCache = freshData
+                lastHolidayCacheUpdate = DateTime.Now
+            End If
+            Return If(publicHolidaysCache, New List(Of PublicHoliday))
+
+        Catch ex As Exception
+            Console.WriteLine($"Error getting public holidays from Google Sheets: {ex.Message}")
+            Return If(publicHolidaysCache, New List(Of PublicHoliday))
+        End Try
+    End Function
+
+    Private Function FetchSurchargeDataFromSheets() As Dictionary(Of String, SurchargeConfig)
+        Dim surchargeData As New Dictionary(Of String, SurchargeConfig)
+        Try
+            Dim range = configuration("GoogleSheets:SurchargesRange")
+            Dim request = service.Spreadsheets.Values.Get(operationalSpreadsheetId, range)
+            Dim response = request.Execute()
+
+            If response.Values IsNot Nothing AndAlso response.Values.Count > 1 Then
+                For i As Integer = 1 To response.Values.Count - 1
+                    Dim row = response.Values(i)
+                    If row.Count >= 5 Then
+                        Try
+                            Dim surchargeType = row(0).ToString().Trim()
+                            Dim description = row(1).ToString().Trim()
+                            Dim type = row(2).ToString().Trim()
+                            Dim amount = ParseNumericValue(row(3).ToString())
+                            Dim enabled = String.Equals(row(4).ToString().Trim(), "true", StringComparison.OrdinalIgnoreCase)
+
+                            If amount.HasValue Then
+                                surchargeData(surchargeType) = New SurchargeConfig With {
+                                .SurchargeType = surchargeType,
+                                .Description = description,
+                                .Type = type,
+                                .Amount = amount.Value,
+                                .Enabled = enabled
+                            }
+                            End If
+                        Catch ex As Exception
+                            Console.WriteLine($"✗ Error parsing surcharge row {i + 1}: {ex.Message}")
+                        End Try
+                    End If
+                Next
+            End If
+        Catch ex As Exception
+            Console.WriteLine($"Error fetching surcharge data from Google Sheets: {ex.Message}")
+            Throw
+        End Try
+        Return surchargeData
+    End Function
+
+    Private Function FetchPublicHolidaysFromSheets() As List(Of PublicHoliday)
+        Dim holidays As New List(Of PublicHoliday)
+        Try
+            Dim range = configuration("GoogleSheets:PublicHolidaysRange")
+            Dim request = service.Spreadsheets.Values.Get(operationalSpreadsheetId, range)
+            Dim response = request.Execute()
+
+            If response.Values IsNot Nothing AndAlso response.Values.Count > 1 Then
+                For i As Integer = 1 To response.Values.Count - 1
+                    Dim row = response.Values(i)
+                    If row.Count >= 3 AndAlso Not String.IsNullOrEmpty(row(0).ToString()) Then
+                        Try
+                            Dim dateStr = row(0).ToString().Trim()
+                            Dim description = row(1).ToString().Trim()
+                            Dim enabled = String.Equals(row(2).ToString().Trim(), "true", StringComparison.OrdinalIgnoreCase)
+
+                            Dim holidayDate As DateTime
+                            If DateTime.TryParse(dateStr, holidayDate) Then
+                                holidays.Add(New PublicHoliday With {
+                                .HolidayDate = holidayDate.Date,
+                                .Description = description,
+                                .Enabled = enabled
+                            })
+                            End If
+                        Catch ex As Exception
+                            Console.WriteLine($"✗ Error parsing holiday row {i + 1}: {ex.Message}")
+                        End Try
+                    End If
+                Next
+            End If
+        Catch ex As Exception
+            Console.WriteLine($"Error fetching public holidays from Google Sheets: {ex.Message}")
+        End Try
+        Return holidays
+    End Function
+
+
 End Class
 
 

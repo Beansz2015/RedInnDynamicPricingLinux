@@ -46,3 +46,29 @@ Public Class PriceHistoryEntry
     Public Property BusinessHour As Integer
     Public Property ConfigSource As String
 End Class
+
+Public Class SurchargeConfig
+    Public Property SurchargeType As String
+    Public Property Description As String
+    Public Property Type As String ' "Percentage" or "Fixed"
+    Public Property Amount As Double
+    Public Property Enabled As Boolean
+End Class
+
+Public Class PublicHoliday
+    Public Property HolidayDate As DateTime
+    Public Property Description As String
+    Public Property Enabled As Boolean
+End Class
+
+Public Class SurchargeResult
+    Public Property BaseRate As Double
+    Public Property WeekendSurcharge As Double
+    Public Property PublicHolidaySurcharge As Double
+    Public Property FinalRate As Double
+    Public Property AppliedSurcharges As List(Of String)
+
+    Public Sub New()
+        AppliedSurcharges = New List(Of String)
+    End Sub
+End Class
