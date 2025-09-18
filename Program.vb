@@ -4,7 +4,7 @@ Imports Microsoft.Extensions.Configuration
 Module Program
     Sub Main(args As String())
         Try
-            Console.WriteLine("=== Red Inn Court Dynamic Pricing Service (.NET 8) ===")
+            Console.WriteLine("=== Red Inn Court Dynamic Pricing Service (.NET 8) V.1.0 ===")
             Console.WriteLine($"Started at: {DateTime.Now}")
             Console.WriteLine()
 
